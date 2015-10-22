@@ -8,15 +8,16 @@
   "author": "Jess Austin <jess.austin@gmail.com>",
   "license": "AGPL-3.0",
   "dependencies": {
-    "@cycle/core": ">=5",
-    "@cycle/dom": ">=7",
-    "rx": ">=4",
-    "rx-combine-latest-obj": ">=1",
-    "rx-injectable-observable": ">=3"
+    "@cycle/core": "*",
+    "@cycle/dom": "*",
+    "@cycle/http": "*",
+    "@cycle/notification": "*",
+    "cycle-local-storage": "github:tylors/cycle-local-storage",
+    "rx": "*"
   },
   "devDependencies": {
-    "beefy": ">=2.1",
-    "browserify": ">=11.1",
-    "coffeeify": ">=1.1"
+    "beefy": "*",
+    "browserify": "*",
+    "coffeeify": "*"
   }
 }
