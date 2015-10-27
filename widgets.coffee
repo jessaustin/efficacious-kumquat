@@ -1,42 +1,50 @@
 {Observable} = require 'rx'
 {h} = require '@cycle/dom'
 
-intendEvents = (dom, name, xform, event='change') ->
-  s = dom.select ".#{name}"
+intendEvent = (dom, name, event='click', targetProp='value') ->
   "#{name}$":
-    s.events event
-      .map xform
+    dom.select ".#{name}"
+      .events event
+        .map (ev) -> ev.target[targetProp]
 
-person = ({props, dom}) ->
-  console.log 'person', props, dom
-  intent = (dom) ->
+person = ({dom, editing}) ->
+  intent = ->
+    console.log 'intent'
     Object.assign {},
-      intendEvents dom, 'eastern', (ev) -> ev.target.checked
-      intendEvents dom, 'edit', ((ev) -> ev), 'click'
-      intendEvents dom, 'save', ((ev) -> ev), 'click'
-      intendEvents dom, 'cancel', ((ev) -> ev), 'click'
-      intendEvents dom, 'given', (ev) -> ev.target.value
-      intendEvents dom, 'family', (ev) -> ev.target.value
+      intendEvent dom, 'eastern', 'change', 'checked'
+      intendEvent dom, 'edit'
+      intendEvent dom, 'save'
+      intendEvent dom, 'remove'
+      intendEvent dom, 'cancel'
+      intendEvent dom, 'given', 'change'
+      intendEvent dom, 'family', 'change'
 
-  model = (props, actions) ->
-    console.log 'in model', actions
-    editing$ = props.get 'editing'
-      .first()
-      .concat Observable.merge (actions.edit$.map -> yes), (actions.save$.map -> no)
-    console.log editing$
-    name$ = Observable.combineLatest (actions.given$.startWith ''), (actions.family$.startWith ''), (given, family) ->
-        {given, family}
-      .sample editing$
-      .map (ev) ->
-        console.log 'name', ev
-        ev
-    console.log name$
+  model = (actions) ->
+    console.log 'model'
+    editing$ = Observable.just editing
+      .concat Observable.merge (actions.edit$.map -> yes),
+        actions.save$.map -> no
+        actions.cancel$.map -> no
+      .map (x) ->
+        console.log 'editing', x
+        x
+    name$ = Observable.combineLatest (actions.given$.startWith ''),
+        (actions.family$.startWith ''), (given, family) -> {given, family}
+      .map (x) ->
+        console.log 'name before sample', x
+        x
+#      .sample editing$
+      .map (x) ->
+        console.log 'name', x
+        x
     eastern$ = actions.eastern$.startWith no
-    Observable.combineLatest editing$, eastern$, name$, (editing, eastern, {given, family}) ->
-      {editing, eastern, given, family}
+    Observable.combineLatest editing$, eastern$, name$,
+      (editing, eastern, {given, family}) ->
+        console.log editing, eastern, given, family
+        {editing, eastern, given, family}
 
   view = (state$) ->
-    console.log 'in view', state$
+    console.log 'view'
     state$.map ({editing, eastern, given, family}) ->
       console.log editing, eastern, given, family
       if editing
@@ -46,7 +54,7 @@ person = ({props, dom}) ->
         f = h 'label', [ 'Family Name: ',
           h 'input.family', type: 'text', key: 'family', value: family
         ]
-        others = h 'div', [
+        rest = h 'div', [
           h 'label', [
             h 'input.eastern', type: 'checkbox', checked: eastern
             'eastern name order?'
@@ -57,12 +65,16 @@ person = ({props, dom}) ->
       else
         g = h 'span.given', key: 'given', given
         f = h 'span.family', key: 'family', family
-        others = h 'button.edit', 'Edit'
+        rest = h 'button.edit', 'Edit'
+      console.log g, f, rest, eastern
       h 'div.person',
-        if eastern then [f, ' ', g, others] else [g, ' ', f, others]
+        if eastern then [f, ' ', g, rest] else [g, ' ', f, rest]
 
-  dom: view model props, intent dom
+  dom: view model intent()
 #  events:
 #    remove: 42
 
-module.exports = {person}
+simple = ->
+  dom: Observable.just h 'div.simple', 'Simple'
+
+module.exports = {person, simple}

@@ -10,6 +10,7 @@
   "dependencies": {
     "@cycle/core": "*",
     "@cycle/dom": "*",
+    "@cycle/history": "*",
     "@cycle/http": "*",
     "@cycle/notification": "*",
     "cycle-local-storage": "github:tylors/cycle-local-storage",
