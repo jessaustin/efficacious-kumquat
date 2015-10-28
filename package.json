@@ -13,7 +13,9 @@
     "@cycle/history": "*",
     "@cycle/http": "*",
     "@cycle/notification": "*",
+    "bootstrap.native": "*",
     "cycle-local-storage": "github:tylors/cycle-local-storage",
+    "hyperscript-helpers": "*",
     "rx": "*"
   },
   "devDependencies": {
