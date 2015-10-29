@@ -1,29 +1,60 @@
-{Observable} = require 'rx'
+{Observable, Subject} = require 'rx'
 {run} = require '@cycle/core'
 {h, makeDOMDriver} = require '@cycle/dom'
-{person, simple} = require './widgets'
+{button, div} = (require 'hyperscript-helpers') h
+{item, person, simple} = require './widgets'
 
-intent = (dom) ->
+itemActions =
+#  up$: new Subject
+#  down$: new Subject
+  remove$: new Subject
+
+intent = (dom, itemActions) ->
   add$:
     dom.select '#add'
       .events 'click'
+  remove$:
+    itemActions.remove$
 
 model = (dom, actions) ->
-  actions.add$.startWith []
-    .scan (acc, _, i) ->
-      x = person dom: dom, editing: yes
-      console.log x
-      acc.concat [ x ]
+  initialState = []
+  newItem = ->
+    ni = item
+      member: person
+      dom: dom
+      args: editing: yes
+    ni.dom = ni.dom.replay null, 1
+    ni.dom.connect()
+    ni.remove$ = ni.remove$.publish()
+    ni.remove$.connect()
+    ni
+  add$ = actions.add$.map ->
+    (items) ->
+      items.concat [ newItem() ]
+  remove$ = actions.remove$.map (id) ->
+    (items) ->
+      items.filter (item) ->
+        item.id isnt id
+  Observable.merge add$, remove$
+    .startWith initialState
+    .scan (items, mod) -> mod items
+    .publishValue initialState
+    .refCount()
 
 view = (state$, dom) ->
   state$.map (children) ->
-    console.log 'view', children
-    h 'div#root', [
-      h 'div#list', children.map (t) -> t.dom
-      h 'button#add', 'Add Person'
+    div [
+#      person dom: dom, editing: yes, id: 999
+#        .dom
+      div '#list', children.map (t) ->
+        t.dom
+      button '#add', 'Add Person'
     ]
 
 run (responses) ->
-  dom: view (model responses.dom, intent responses.dom), responses.dom
+  state$ = model responses.dom, intent responses.dom, itemActions
+#  state$.subscribe itemActions.remove$.asObserver()
+
+  dom: view state$, responses.dom
 ,
   dom: makeDOMDriver '#app'
