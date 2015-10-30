@@ -17,7 +17,6 @@ count = do (n = 0) ->
 
 # items go in arrays, and handle reordering and removal of children
 item = ({dom, member, args}) ->
-  console.log 'item', dom, member, args
   id = count.next().value
   member = member Object.assign (args ? {}), {dom, id}
 
@@ -38,22 +37,18 @@ item = ({dom, member, args}) ->
     initRemove$ = actions.remove$
     cancelRemove$ = actions.cancel$
     removing$ = Observable.just no
-      .merge initRemove$.map(-> yes), cancelRemove$.map -> no
+      .merge initRemove$.map(-> yes), cancelRemove$.map(-> no)
     reallyRemove$ = actions.really$
       .map -> id
     state$ = Observable.combineLatest removing$,
       Observable.just null
         .concat actions.member$
-        .map (t) ->
-          console.log 't', t
-          t
     {state$, reallyRemove$}
 #    {reorder$, removing$, reallyRemove$}
 
   view = ({state$}) ->
     state$.map ([remove, member]) ->
       div ".item#item#{id}", [
-        console.log 'view', remove, member
         member
         div '.controls',
           if remove
@@ -67,7 +62,6 @@ item = ({dom, member, args}) ->
             ]
       ]
   actions = intent()
-  console.log 'actions', actions
   state = model actions
 
   dom: view state
@@ -76,33 +70,44 @@ item = ({dom, member, args}) ->
   id: id
 
 person = ({dom, editing, id}) ->
-  console.log 'person', dom, editing, id
   intent = ->
     Object.assign {},
-      intendEvent dom, id, 'eastern', 'change', 'checked'
       intendEvent dom, id, 'edit'
       intendEvent dom, id, 'save'
       intendEvent dom, id, 'cancel'
       intendEvent dom, id, 'given', 'change'
       intendEvent dom, id, 'family', 'change'
+      intendEvent dom, id, 'eastern', 'change', 'checked'
 
   model = (actions) ->
     editing$ = Observable.just editing
-      .concat Observable.merge (actions.edit$.map -> yes),
+      .concat Observable.merge actions.edit$.map(-> yes),
         actions.save$.map -> no
         actions.cancel$.map -> no
+    # might want to eventually get these from local storage
     given$ = actions.given$.startWith ''
     family$ = actions.family$.startWith ''
     eastern$ = actions.eastern$.startWith no
+    # lump together for convenience
     value$ = Observable.combineLatest given$, family$, eastern$
-      .sample actions.save$.startWith ''
-    Observable.combineLatest editing$, value$
+    # only when 'save' is clicked
+    saved$ = value$.sample actions.save$.startWith null
+    # also get (previous) saved$ when 'cancel' is clicked
+    value$ = Observable.merge value$, saved$, saved$.sample actions.cancel$
+    # "edge-detection" hack: we want to notice a change to any of given$, etc.
+    # only right after we start editing
+    changed$ = Observable.combineLatest editing$,
+        Observable.merge given$, family$, eastern$
+      .startWith [no, null]
+      .startWith [no, null]
+      .map ([e, _]) -> e
+      .pairwise()
+      .map ([a, b]) -> a and b
+    Observable.combineLatest editing$, changed$, value$
 
   view = (state$) ->
-    state$.map ([editing, [given, family, eastern]]) ->
-      console.log 'person view', editing, given, family, eastern
+    state$.map ([editing, changed, [given, family, eastern]]) ->
       if editing
-        console.log 'editing!'
         g = label [
           'Given Name: '
           input ".given_#{id}", type: 'text', value: given
@@ -111,21 +116,22 @@ person = ({dom, editing, id}) ->
           'Family Name: '
           input ".family_#{id}", type: 'text', value: family
         ]
-        rest = div [
+        rest = [
           label [
             input ".eastern_#{id}", type: 'checkbox', checked: eastern
             'eastern name order?'
           ]
-          button ".save_#{id}", 'Save'
-          button ".cancel_#{id}", 'Cancel'
         ]
+        if changed
+          rest.push button(".save_#{id}", 'Save'),
+            button ".cancel_#{id}", 'Cancel'
       else
+        # do we need .classes on these?
         g = span ".given_#{id}", given
         f = span ".family_#{id}", family
         rest = button ".edit_#{id}", 'Edit'
-      console.log g, f, rest
       div ".person_#{id}",
-        if eastern then [f, ' ', g, rest] else [g, ' ', f, rest]
+        (if eastern then [f, ' ', g] else [g, ' ', f]).concat rest
 
   dom: view model intent()
 

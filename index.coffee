@@ -44,8 +44,6 @@ model = (dom, actions) ->
 view = (state$, dom) ->
   state$.map (children) ->
     div [
-#      person dom: dom, editing: yes, id: 999
-#        .dom
       div '#list', children.map (t) ->
         t.dom
       button '#add', 'Add Person'
